@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+first committeeml>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
@@ -234,7 +234,7 @@
         <div class="table-wrap" id="vivo-table-wrap">
           <table class="data">
             <thead>
-              <tr><th>Docente</th><th>Estado</th><th>Distancia</th><th>Hora</th></tr>
+              <tr><th>Docente</th><th>Estado</th><th>Distancia</th><th>Hora</th><th>Señal</th></tr>
             </thead>
             <tbody id="tbody-vivo"></tbody>
           </table>
@@ -335,10 +335,24 @@
       });
     }
 
-    socket.on('lista_dispositivos', function (arr) {
+    var ultimaLista = [];
+    var VIVO_MS = 5 * 60 * 1000; // una señal deja de contar como «en el área» a los 5 min
+
+    function hace(ts) {
+      if (!ts) return '—';
+      var s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+      if (s < 60) return 'hace ' + s + ' s';
+      var m = Math.round(s / 60);
+      if (m < 60) return 'hace ' + m + ' min';
+      return 'hace ' + Math.round(m / 60) + ' h';
+    }
+
+    function renderVivo() {
       var id = String(colegioActual || '');
-      var rel = arr.filter(function (d) {
+      var rel = ultimaLista.filter(function (d) {
         return !id || String(d.colegio_id || '') === id || !d.colegio_id;
+      }).filter(function (d) {
+        return d.ultimaVez && Date.now() - d.ultimaVez < VIVO_MS;
       });
 
       document.getElementById('s-total').textContent = rel.length;
@@ -353,9 +367,13 @@
           '<td>' + (d.dentro ? '<span class="badge ok">Dentro</span>' : '<span class="badge warn">Fuera</span>') + '</td>' +
           '<td>' + (d.distanciaM == null ? '—' : d.distanciaM + ' m') + '</td>' +
           '<td>' + (d.hora || '—') + '</td>' +
+          '<td>' + (d.conectado
+            ? '<span class="badge ok">En vivo</span>'
+            : '<span class="badge neutral">' + hace(d.ultimaVez) + '</span>') + '</td>' +
           '</tr>';
       }).join('');
 
+      var arr = ultimaLista;
       if (map) {
         arr.forEach(function (d) {
           if (d.lat == null) return;
@@ -368,7 +386,15 @@
           }
         });
       }
+    }
+
+    socket.on('lista_dispositivos', function (arr) {
+      ultimaLista = arr;
+      renderVivo();
     });
+
+    // Refresca los «hace X» aunque no lleguen posiciones nuevas
+    setInterval(renderVivo, 5000);
 
     function verReporte() {
       var id = document.getElementById('colegio').value;

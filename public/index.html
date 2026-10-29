@@ -193,6 +193,12 @@
         <button id="btn-checkin" class="btn btn-ok btn-block" type="button">Registrar mi ingreso</button>
       </div>
 
+      <div id="sesion" class="notice ok" style="display: none">
+        <strong>Sesión de asistencia activa</strong> <span id="sesion-info">—</span>
+        <button id="btn-sesion" class="btn btn-small" type="button">Terminar jornada</button>
+        <div class="notice-fine">Sigue enviando tu ubicación aunque cambies de pestaña o a otra app. Si cierras el navegador, el envío se detiene: vuelve a abrir esta página y se reanuda solo.</div>
+      </div>
+
       <div id="https-box" class="notice warn" style="display: none">
         <strong>Estás en HTTP.</strong> Chrome bloquea el GPS en conexiones no seguras.<br />
         Abre la versión segura:
@@ -233,6 +239,43 @@
       var watchId = null;
       var ultimoEnvio = 0;
       var THROTTLE_MS = 3000;
+
+      // ---------- sesión de asistencia (sobrevive a recargas y cambios de página) ----------
+      var SES_KEY = 'sesion_asistencia';
+      var sesionEl = document.getElementById('sesion');
+      var sesionInfoEl = document.getElementById('sesion-info');
+      var sesionBtn = document.getElementById('btn-sesion');
+
+      function leerSesion() {
+        try { return JSON.parse(localStorage.getItem(SES_KEY) || 'null'); } catch (e) { return null; }
+      }
+      function guardarSesion(obj) {
+        try { localStorage.setItem(SES_KEY, JSON.stringify(obj)); } catch (e) {}
+      }
+      function borrarSesion() {
+        try { localStorage.removeItem(SES_KEY); } catch (e) {}
+      }
+      function mostrarSesion(s) {
+        if (!s || !s.activo) { sesionEl.style.display = 'none'; return; }
+        sesionEl.style.display = 'block';
+        sesionInfoEl.textContent = '· desde las ' + (s.desdeHora || '—') + (s.colegioNombre ? ' en ' + s.colegioNombre : '') + '.';
+      }
+      function nombreColegioElegido() {
+        var o = colegioSel.options[colegioSel.selectedIndex];
+        return o ? o.textContent.replace(/\s*\(\d+\s*m\)\s*$/, '') : '';
+      }
+      function iniciarSesion() {
+        var s = leerSesion();
+        if (!s || !s.activo) {
+          s = { activo: true, desde: Date.now(), desdeHora: new Date().toLocaleTimeString('es-ES', { hour12: false }) };
+        }
+        if (colegioSel.value) {
+          s.colegio_id = colegioSel.value;
+          s.colegioNombre = nombreColegioElegido();
+        }
+        guardarSesion(s);
+        mostrarSesion(s);
+      }
 
       // ---------- utilidades de interfaz ----------
 
@@ -409,6 +452,7 @@
         btn.textContent = 'Detener rastreo';
         btn.className = 'btn btn-danger btn-block';
         setEstado(socket.connected ? 'Rastreando…' : 'Conectado', 'ok');
+        iniciarSesion();
       }
 
       function detener() {
@@ -418,7 +462,51 @@
         btn.textContent = 'Iniciar rastreo';
         btn.className = 'btn btn-dark btn-block';
         setEstado(socket.connected ? 'Conectado' : 'Desconectado', socket.connected ? 'ok' : 'off');
+        borrarSesion();
+        mostrarSesion(null);
       }
+
+      sesionBtn.addEventListener('click', function () { detener(); });
+
+      // Al cerrar o salir de la página se manda la última posición conocida
+      // (sendBeacon funciona aunque la pestaña se esté cerrando).
+      function enviarUltimaPosicion() {
+        var s = leerSesion();
+        if (!s || !s.activo || !window.__lastPos) return;
+        var body = JSON.stringify({
+          deviceId: deviceId,
+          nombre: miNombre(),
+          colegio_id: colegioSel.value,
+          lat: window.__lastPos.lat,
+          lon: window.__lastPos.lon
+        });
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon('/api/posicion', new Blob([body], { type: 'application/json' }));
+        } else {
+          fetch('/api/posicion', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: body,
+            keepalive: true
+          }).catch(function () {});
+        }
+      }
+      window.addEventListener('pagehide', enviarUltimaPosicion);
+
+      // Chrome pausa el GPS en segundo plano: al volver, se reanuda el rastreo solo.
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState !== 'visible') return;
+        if (!window.isSecureContext) return;
+        var s = leerSesion();
+        if (!s || !s.activo) return;
+        if (!rastreando) { iniciar(); return; }
+        if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+        watchId = navigator.geolocation.watchPosition(onSuccess, onError, {
+          enableHighAccuracy: true,
+          maximumAge: 1000,
+          timeout: 10000
+        });
+      });
 
       btn.addEventListener('click', function () {
         if (rastreando) detener();
@@ -443,6 +531,8 @@
         }).then(function (r) { return r.json(); }).then(function (j) {
           if (j.dentro) {
             feedback('✅ Ingreso registrado en ' + (j.colegio.nombre || '') + ' a las ' + j.hora + ' (' + j.distanciaM + ' m).', 'ok');
+            // El ingreso deja la sesión abierta: el envío continúa solo.
+            if (rastreando) iniciarSesion(); else iniciar();
           } else {
             feedback('⚠️ Estás a ' + j.distanciaM + ' m, fuera del radio. Acércate al colegio y reintenta.', 'warn');
           }
@@ -450,6 +540,12 @@
           feedback('Error de red al registrar.', 'bad');
         });
       });
+      // ---------- reanudar sesión si la había (recarga, cambio de página, app reabierta) ----------
+      var sesionPrevia = leerSesion();
+      if (sesionPrevia && sesionPrevia.activo) {
+        mostrarSesion(sesionPrevia);
+        setTimeout(function () { if (!rastreando) iniciar(); }, 500);
+      }
     })();
   </script>
 </body>

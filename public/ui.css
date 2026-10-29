@@ -395,6 +395,12 @@ select.control { padding-right: 34px; }
   color: #7d5a1c;
 }
 
+.notice.ok {
+  background: #ecf8f1;
+  border-color: #cfeadd;
+  color: #2b7a55;
+}
+
 .notice a { color: #8a5316; font-weight: 700; word-break: break-all; }
 .notice .btn { margin-top: 10px; }
 .notice-fine { margin-top: 8px; font-size: 0.76rem; opacity: 0.85; }

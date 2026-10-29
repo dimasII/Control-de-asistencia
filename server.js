@@ -77,6 +77,48 @@ app.get('/api/geocerca', (req, res) => {
 });
 app.get('/api/dispositivos', (req, res) => res.json(Array.from(dispositivos.values())));
 
+// Posición por HTTP: la usa el celular al cerrar/minimizar la pestaña (sendBeacon),
+// o cuando el socket está caído. Misma validación y misma geocerca que por Socket.io.
+app.post('/api/posicion', (req, res) => {
+  const { deviceId, nombre, colegio_id, lat, lon } = req.body || {};
+  const nLat = Number(lat);
+  const nLon = Number(lon);
+  if (!deviceId || !esCoordenadaValida(nLat, nLon)) return res.status(400).json({ error: 'deviceId/lat/lon inválidos' });
+  const id = String(deviceId).slice(0, 64);
+  const nom = String(nombre || 'Sin nombre').slice(0, 40);
+  const col = getColegio(colegio_id);
+  const dist = distanciaMetros(nLat, nLon, col.lat, col.lon);
+  const dentro = dist <= col.radioM;
+  const ahora = new Date();
+  const prev = dispositivos.get(id) || {};
+
+  dispositivos.set(id, {
+    deviceId: id, nombre: nom, socketId: prev.socketId ?? null, lat: nLat, lon: nLon,
+    colegio_id: col.id, colegio: col.nombre,
+    distanciaM: Math.round(dist), dentro,
+    fecha: ahora.toLocaleDateString('es-ES'),
+    hora: ahora.toLocaleTimeString('es-ES', { hour12: false }),
+    mapsUrl: `https://www.google.com/maps?q=${nLat},${nLon}`,
+    conectado: prev.conectado ?? false, ultimaVez: Date.now()
+  });
+
+  // Mismo autoguardado que el socket: dentro del radio y máx. 1 registro por minuto
+  if (dentro) {
+    const key = id + ':' + col.id;
+    const last = ultimoGuardado.get(key) || 0;
+    if (Date.now() - last > 60000) {
+      ultimoGuardado.set(key, Date.now());
+      guardarRegistro({ colegio_id: col.id, deviceId: id, nombre: nom, lat: nLat, lon: nLon });
+    }
+  }
+
+  if (ioRef) {
+    ioRef.emit('posicion_filtrada', { ...dispositivos.get(id), id });
+    ioRef.emit('lista_dispositivos', Array.from(dispositivos.values()));
+  }
+  res.json({ ok: true, dentro, distanciaM: Math.round(dist) });
+});
+
 // Guardar registro de ingreso (docente -> colegio), con fecha/hora del servidor
 function guardarRegistro({ colegio_id, deviceId, nombre, lat, lon }) {
   const col = getColegio(colegio_id);
@@ -152,6 +194,7 @@ function esCoordenadaValida(lat, lon) {
 // 3. Lógica Socket.io compartida (misma para HTTP y HTTPS)
 // Roles: móvil (/) envía GPS, supervisor (/monitor.html) solo observa
 const dispositivos = new Map(); // deviceId -> { deviceId, nombre, socketId, lat, lon, distanciaM, dentro, fecha, hora, mapsUrl, conectado, ultimaVez }
+let ioRef = null; // referencia para las rutas HTTP que también actualizan presencia
 
 function broadcastLista(io) {
   io.emit('lista_dispositivos', Array.from(dispositivos.values()));
@@ -280,6 +323,7 @@ const ioOpts = {
 // Servidor HTTP (laptop / compatibilidad)
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, ioOpts);
+ioRef = io;
 configurarSockets(io);
 
 httpServer.listen(PORT, '0.0.0.0', () => {
