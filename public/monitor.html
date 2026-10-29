@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    "git.autofetch": true, content="#fbfaf6" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23fbfaf6'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%236aa7c9'/%3E%3C/svg%3E" />
+  <title>Supervisor · Asistencia docente rural</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="/ui.css" />
+  <style>
+    .hero {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+      flex-wrap: wrap;
+      padding: 20px 22px;
+      border-radius: var(--radius-xl);
+      margin-bottom: 12px;
+    }
+    .hero h1 {
+      margin-top: 12px;
+      font-size: clamp(1.6rem, 3.2vw, 2.4rem);
+      line-height: 1.04;
+      font-weight: 680;
+      letter-spacing: -0.05em;
+    }
+    .hero p { margin-top: 10px; max-width: 64ch; color: var(--muted); font-size: 0.92rem; line-height: 1.6; }
+
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip {
+      padding: 7px 13px;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      font-weight: 600;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      box-shadow: inset 0 1px 0 #fff;
+      white-space: nowrap;
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) minmax(0, 0.8fr) auto;
+      gap: 12px;
+      align-items: end;
+      padding: 16px;
+      border-radius: var(--radius-xl);
+      margin-bottom: 12px;
+    }
+    .toolbar-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .stat-card { padding: 16px 18px; border-radius: var(--radius-lg); }
+    .stat-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.68rem;
+      font-weight: 650;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .stat-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex: 0 0 auto;
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgba(106, 167, 201, 0.14);
+    }
+    .stat-dot.ok { background: var(--ok); box-shadow: 0 0 0 4px rgba(47, 158, 110, 0.16); }
+    .stat-dot.warn { background: var(--warn); box-shadow: 0 0 0 4px rgba(200, 134, 42, 0.16); }
+    .stat-dot.accent { background: var(--accent-2); box-shadow: 0 0 0 4px rgba(122, 134, 214, 0.14); }
+    .stat-num {
+      margin-top: 9px;
+      font-size: 1.9rem;
+      line-height: 1;
+      font-weight: 680;
+      letter-spacing: -0.05em;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-sub { margin-top: 4px; font-size: 0.72rem; color: var(--muted); }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+      gap: 12px;
+      margin-bottom: 12px;
+      align-items: start;
+    }
+
+    .panel-card { padding: 16px; border-radius: var(--radius-xl); }
+    .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .panel-head h2 { margin-top: 3px; font-size: 1.02rem; }
+
+    .table-wrap { margin-top: 2px; }
+    .empty-state {
+      padding: 22px 12px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+      line-height: 1.6;
+    }
+    .empty-state[hidden] { display: none; }
+
+    #map {
+      height: clamp(320px, 42vh, 460px);
+      border-radius: 20px;
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      background: rgba(255, 255, 255, 0.55);
+      z-index: 0;
+    }
+
+    .leaflet-control-zoom a {
+      color: var(--ink) !important;
+      border-radius: 9px !important;
+    }
+
+    @media (max-width: 640px) {
+      .data .col-fecha, .data .col-coords { display: none; }
+    }
+
+    @media (max-width: 900px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 860px) {
+      .toolbar { grid-template-columns: 1fr 1fr; }
+      .toolbar-actions { grid-column: 1 / -1; justify-content: flex-start; }
+    }
+
+    @media (max-width: 640px) {
+      .stats { gap: 8px; }
+      .stat-card { padding: 13px 14px; }
+      .stat-num { font-size: 1.5rem; }
+      .stat-top { font-size: 0.6rem; letter-spacing: 0.08em; }
+      .stat-sub { display: none; }
+            <a class="link" href="/inicio.html">Home →</a>
+
+    @media (max-width: 520px) {
+      .toolbar { grid-template-columns: 1fr; }
+      .toolbar-actions { grid-column: auto; }
+      .toolbar-actions .btn { flex: 1 1 auto; }
+      .hero { padding: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+
+  <main class="shell">
+    <header class="glass deboss topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"><span></span></div>
+        <div>
+          <div class="eyebrow">Geocerca rural</div>
+          <div class="brand-name">Centro de control</div>
+        </div>
+      </div>
+      <nav class="topbar-nav">
+        <a class="nav-pill" href="/">Docente</a>
+        <a class="nav-pill active" href="/monitor.html" aria-current="page">Supervisor</a>
+      </nav>
+      <div class="topbar-right">
+        <span id="estado" class="state-pill neutral">Conectando…</span>
+      </div>
+    </header>
+
+    <section class="glass deboss hero">
+      <div>
+        <span class="pill"><span class="pill-dot"></span> Monitoreo en tiempo real</span>
+        <h1>Asistencia docente por colegio.</h1>
+        <p>Quién está dentro del radio ahora, historial con hora del servidor y reportes listos para Excel.</p>
+      </div>
+      <div class="chips">
+        <span id="info" class="chip">Cargando colegio…</span>
+        <span class="chip">Geocerca 200 m</span>
+      </div>
+    </section>
+
+    <section class="glass deboss toolbar">
+      <div>
+        <label class="field-label" for="colegio">Colegio</label>
+        <select id="colegio" class="control"></select>
+      </div>
+      <div>
+        <label class="field-label" for="fecha">Fecha</label>
+        <input type="date" id="fecha" class="control" />
+      </div>
+      <div class="toolbar-actions">
+        <button id="btn-ver" class="btn btn-dark" type="button">Ver reporte</button>
+        <button id="btn-csv" class="btn btn-ok" type="button">Descargar CSV</button>
+        <button id="btn-add" class="btn" type="button">+ Colegio</button>
+      </div>
+    </section>
+
+    <section class="stats">
+      <article class="glass deboss stat-card">
+        <div class="stat-top"><span class="stat-dot accent"></span> Conectados</div>
+        <div class="stat-num" id="s-total">0</div>
+        <div class="stat-sub">en este colegio</div>
+      </article>
+      <article class="glass deboss stat-card">
+        <div class="stat-top"><span class="stat-dot ok"></span> Dentro ahora</div>
+        <div class="stat-num" id="s-in">0</div>
+        <div class="stat-sub">geocerca activa</div>
+      </article>
+      <article class="glass deboss stat-card">
+        <div class="stat-top"><span class="stat-dot warn"></span> Registros</div>
+        <div class="stat-num" id="s-bd">0</div>
+        <div class="stat-sub">del día en tesis.db</div>
+      </article>
+    </section>
+
+    <div class="main-grid">
+      <section class="glass deboss panel-card">
+        <div class="panel-head">
+          <div>
+            <div class="eyebrow">Ahora mismo</div>
+            <h2>Docentes en el área</h2>
+          </div>
+          <span class="badge ok">En vivo</span>
+        </div>
+        <div class="table-wrap" id="vivo-table-wrap">
+          <table class="data">
+            <thead>
+              <tr><th>Docente</th><th>Estado</th><th>Distancia</th><th>Hora</th></tr>
+            </thead>
+            <tbody id="tbody-vivo"></tbody>
+          </table>
+        </div>
+        <div id="vivo-empty" class="empty-state" hidden>Nadie conectado a este colegio aún.</div>
+      </section>
+
+      <section class="glass deboss panel-card">
+        <div class="panel-head">
+          <div>
+            <div class="eyebrow">Mapa</div>
+            <h2>Centro y radio</h2>
+          </div>
+          <span class="badge neutral">OpenStreetMap</span>
+        </div>
+        <div id="map"></div>
+      </section>
+    </div>
+
+    <section class="glass deboss panel-card">
+      <div class="panel-head">
+        <div>
+          <div class="eyebrow">Historial guardado</div>
+          <h2>Registros del día</h2>
+        </div>
+        <span class="hint">Fecha y hora del servidor</span>
+      </div>
+      <div class="table-wrap" id="hist-table-wrap">
+        <table class="data">
+          <thead>
+            <tr><th class="col-fecha">Fecha</th><th>Hora</th><th>Docente</th><th>Dentro</th><th>Dist.</th><th class="col-coords">Coordenadas</th><th>Mapa</th></tr>
+          </thead>
+          <tbody id="tbody-hist"></tbody>
+        </table>
+      </div>
+      <div id="hist-empty" class="empty-state" hidden>Sin registros para ese día y colegio.</div>
+    </section>
+
+    <p class="fineprint">Datos locales en SQLite · sin dependencias de la nube · actualización cada 15 s</p>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    var map, marks = {}, colegioActual = null;
+
+    var hoy = new Date().toISOString().slice(0, 10);
+    document.getElementById('fecha').value = hoy;
+
+    var estadoEl = document.getElementById('estado');
+    var socket = io();
+
+    socket.on('connect', function () {
+      estadoEl.className = 'state-pill ok';
+      estadoEl.textContent = 'En vivo';
+    });
+    socket.on('disconnect', function () {
+      estadoEl.className = 'state-pill off';
+      estadoEl.textContent = 'Sin conexión';
+    });
+
+    function loadColegios() {
+      fetch('/api/colegios').then(function (r) { return r.json(); }).then(function (arr) {
+        var sel = document.getElementById('colegio');
+        sel.innerHTML = arr.map(function (c) {
+          return '<option value="' + c.id + '">' + c.nombre + ' (' + c.radioM + ' m)</option>';
+        }).join('');
+        if (!colegioActual) colegioActual = arr[0] && arr[0].id;
+        if (colegioActual) sel.value = colegioActual;
+        pintarMapa();
+        verReporte();
+      });
+    }
+
+    function pintarMapa() {
+      var id = document.getElementById('colegio').value;
+      colegioActual = id;
+      fetch('/api/geocerca?colegio_id=' + id).then(function (r) { return r.json(); }).then(function (g) {
+        document.getElementById('info').textContent = g.nombre + ' · radio ' + g.radioM + ' m';
+        if (!map) {
+          map = L.map('map').setView([g.lat, g.lon], 16);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+        } else {
+          map.setView([g.lat, g.lon], 16);
+        }
+
+        Object.keys(marks).forEach(function (k) { map.removeLayer(marks[k]); });
+        marks = {};
+
+        if (map._centro) { map.removeLayer(map._centro); map.removeLayer(map._circ); }
+        map._centro = L.marker([g.lat, g.lon]).addTo(map).bindPopup('Centro<br>' + esc(g.nombre));
+        map._circ = L.circle([g.lat, g.lon], {
+          radius: g.radioM,
+          color: '#2f9e6e',
+          fillColor: '#2f9e6e',
+          fillOpacity: 0.12
+        }).addTo(map);
+      });
+    }
+
+    socket.on('lista_dispositivos', function (arr) {
+      var id = String(colegioActual || '');
+      var rel = arr.filter(function (d) {
+        return !id || String(d.colegio_id || '') === id || !d.colegio_id;
+      });
+
+      document.getElementById('s-total').textContent = rel.length;
+      document.getElementById('s-in').textContent = rel.filter(function (d) { return d.dentro; }).length;
+
+      document.getElementById('vivo-table-wrap').hidden = rel.length === 0;
+      document.getElementById('vivo-empty').hidden = rel.length > 0;
+
+      document.getElementById('tbody-vivo').innerHTML = rel.map(function (d) {
+        return '<tr>' +
+          '<td><strong>' + esc(d.nombre) + '</strong></td>' +
+          '<td>' + (d.dentro ? '<span class="badge ok">Dentro</span>' : '<span class="badge warn">Fuera</span>') + '</td>' +
+          '<td>' + (d.distanciaM == null ? '—' : d.distanciaM + ' m') + '</td>' +
+          '<td>' + (d.hora || '—') + '</td>' +
+          '</tr>';
+      }).join('');
+
+      if (map) {
+        arr.forEach(function (d) {
+          if (d.lat == null) return;
+          var color = d.dentro ? '#2f9e6e' : '#c8862a';
+          if (!marks[d.deviceId]) {
+            marks[d.deviceId] = L.circleMarker([d.lat, d.lon], { radius: 8, color: color }).addTo(map);
+          } else {
+            marks[d.deviceId].setLatLng([d.lat, d.lon]);
+            marks[d.deviceId].setStyle({ color: color });
+          }
+        });
+      }
+    });
+
+    function verReporte() {
+      var id = document.getElementById('colegio').value;
+      var fecha = document.getElementById('fecha').value;
+      fetch('/api/registros?colegio_id=' + id + '&fecha=' + fecha).then(function (r) { return r.json(); }).then(function (rows) {
+        document.getElementById('s-bd').textContent = rows.length;
+
+        document.getElementById('hist-table-wrap').hidden = rows.length === 0;
+        document.getElementById('hist-empty').hidden = rows.length > 0;
+
+        document.getElementById('tbody-hist').innerHTML = rows.map(function (r) {
+          return '<tr>' +
+            '<td class="col-fecha">' + r.fecha + '</td>' +
+            '<td>' + r.hora + '</td>' +
+            '<td><strong>' + esc(r.nombre) + '</strong></td>' +
+            '<td>' + (r.dentro ? '<span class="badge ok">Sí</span>' : '<span class="badge warn">No</span>') + '</td>' +
+            '<td>' + r.distanciaM + ' m</td>' +
+            '<td class="coords col-coords">' + Number(r.lat).toFixed(6) + ', ' + Number(r.lon).toFixed(6) + '</td>' +
+            '<td><a class="link" target="_blank" rel="noopener" href="' + r.mapsUrl + '">Abrir</a></td>' +
+            '</tr>';
+        }).join('');
+      });
+    }
+
+    document.getElementById('btn-ver').onclick = verReporte;
+
+    document.getElementById('colegio').onchange = function () {
+      pintarMapa();
+      verReporte();
+    };
+
+    document.getElementById('btn-csv').onclick = function () {
+      var id = document.getElementById('colegio').value;
+      var fecha = document.getElementById('fecha').value;
+      location.href = '/api/reporte.csv?colegio_id=' + id + '&fecha=' + fecha;
+    };
+
+    document.getElementById('btn-add').onclick = function () {
+      var nombre = prompt('Nombre del colegio de prueba:', 'I.E. Rural Prueba 02');
+      if (!nombre) return;
+      var lat = parseFloat(prompt('Latitud (de Google Maps, clic derecho):', '-13.62'));
+      var lon = parseFloat(prompt('Longitud:', '-72.87'));
+      fetch('/api/colegios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: nombre, lat: lat, lon: lon, radioM: 200 })
+      }).then(function (r) { return r.json(); }).then(function () { loadColegios(); });
+    };
+
+    function esc(s) {
+      return String(s || '').replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+
+    loadColegios();
+    setInterval(verReporte, 15000);
+  </script>
+</body>
+</html>

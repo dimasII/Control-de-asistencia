@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#fbfaf6" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23fbfaf6'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%236aa7c9'/%3E%3C/svg%3E" />
+  <title>Geocerca rural · Registro docente</title>
+  <link rel="stylesheet" href="/ui.css" />
+  <style>
+    .app { max-width: 560px; }
+
+    .hero-card { padding: 22px; border-radius: var(--radius-xl); margin-bottom: 12px; }
+    .hero-card h1 {
+      margin-top: 14px;
+      font-size: clamp(1.7rem, 6vw, 2.25rem);
+      line-height: 1.03;
+      font-weight: 680;
+      letter-spacing: -0.05em;
+    }
+    .hero-card p { margin-top: 12px; color: var(--muted); font-size: 0.92rem; line-height: 1.65; }
+    .hero-foot {
+      margin-top: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .stack > * + * { margin-top: 12px; }
+
+    .form-grid { display: grid; gap: 14px; }
+
+    .geo-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+    .geo-copy { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
+    .geo-copy .badge { max-width: 100%; white-space: normal; }
+
+    .gauge {
+      --p: 0;
+      --g: var(--muted);
+      flex: 0 0 auto;
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      background: conic-gradient(var(--g) calc(var(--p) * 1turn), rgba(148, 163, 184, 0.16) 0);
+      transition: background 0.4s ease;
+    }
+    .gauge::before {
+      content: "";
+      position: absolute;
+      inset: 7px;
+      border-radius: 50%;
+      background: linear-gradient(180deg, #ffffff, rgba(248, 250, 252, 0.9));
+      box-shadow: inset 0 2px 6px rgba(15, 23, 42, 0.06);
+    }
+    .gauge-in { position: relative; text-align: center; padding: 0 4px; }
+    .gauge-in b {
+      display: block;
+      font-size: 1.02rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.1;
+    }
+    .gauge-in span {
+      display: block;
+      margin-top: 2px;
+      font-size: 0.55rem;
+      font-weight: 650;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .gauge.ok { --g: var(--ok); }
+    .gauge.warn { --g: var(--warn); }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .metric {
+      padding: 10px 12px;
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(248, 250, 252, 0.72));
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      box-shadow: inset 0 1px 0 #fff;
+      min-width: 0;
+    }
+    .metric span {
+      display: block;
+      font-size: 0.58rem;
+      font-weight: 650;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .metric strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.84rem;
+      font-weight: 650;
+      font-variant-numeric: tabular-nums;
+      word-break: break-all;
+    }
+
+    .actions { display: grid; gap: 10px; margin-top: 12px; }
+
+    @media (max-width: 380px) {
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .metrics .metric:last-child { grid-column: span 2; }
+      .gauge { width: 86px; height: 86px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+
+  <main class="shell app">
+    <header class="glass deboss topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"><span></span></div>
+        <div>
+          <div class="eyebrow">Geocerca rural</div>
+          <div class="brand-name">Asistencia docente</div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <span id="estado" class="state-pill off">Desconectado</span>
+      </div>
+    </header>
+
+    <div class="stack">
+      <section class="glass deboss hero-card">
+        <span class="pill"><span class="pill-dot"></span> GPS de precisión · radio 200 m</span>
+        <h1>Tu llegada, verificada por geocerca.</h1>
+        <p>Activa el GPS, acércate al colegio y registra tu ingreso. La fecha y la hora las pone el servidor, no tu celular.</p>
+        <div class="hero-foot">
+          <span id="secure" class="badge neutral">Comprobando seguridad…</span>
+          <span style="display: flex; gap: 14px; flex-wrap: wrap">
+            <a class="link" href="/monitor.html">Panel del supervisor →</a>
+            <a class="link" href="/inicio.html">Inicio →</a>
+          </span>
+        </div>
+      </section>
+
+      <section class="glass deboss card">
+        <div class="card-head">
+          <h2>Identificación</h2>
+          <span class="hint">Se recuerda en este equipo</span>
+        </div>
+        <div class="form-grid">
+          <div>
+            <label class="field-label" for="colegio">Colegio</label>
+            <select id="colegio" class="control"></select>
+          </div>
+          <div>
+            <label class="field-label" for="nombre">Tu nombre</label>
+            <input id="nombre" class="control" placeholder="Ej: María Quispe" autocomplete="name" />
+          </div>
+        </div>
+      </section>
+
+      <section class="glass deboss card">
+        <div class="geo-head">
+          <div class="geo-copy">
+            <div class="eyebrow">Estado de la geocerca</div>
+            <span id="geo" class="badge neutral" aria-live="polite">Sin señal GPS</span>
+            <div class="muted-line">Último envío <span id="last">—</span></div>
+          </div>
+          <div id="gauge" class="gauge" style="--p: 0">
+            <div class="gauge-in">
+              <b id="dist">—</b>
+              <span>del centro</span>
+            </div>
+          </div>
+        </div>
+        <div class="metrics">
+          <div class="metric"><span>Latitud</span><strong id="lat">—</strong></div>
+          <div class="metric"><span>Longitud</span><strong id="lon">—</strong></div>
+          <div class="metric"><span>Precisión</span><strong id="acc">—</strong></div>
+        </div>
+      </section>
+
+      <div class="actions">
+        <button id="btn" class="btn btn-dark btn-block" type="button">Iniciar rastreo</button>
+        <button id="btn-checkin" class="btn btn-ok btn-block" type="button">Registrar mi ingreso</button>
+      </div>
+
+      <div id="https-box" class="notice warn" style="display: none">
+        <strong>Estás en HTTP.</strong> Chrome bloquea el GPS en conexiones no seguras.<br />
+        Abre la versión segura:
+        <a id="https-link" href="#">…</a>
+        <button id="https-go" class="btn btn-accent btn-small" type="button">Abrir versión HTTPS 🔒</button>
+        <div class="notice-fine">Si aparece «No es privado» → Avanzado → Continuar. Es tu certificado local.</div>
+      </div>
+
+      <div id="error" class="feedback" role="status" aria-live="polite"></div>
+
+      <p class="fineprint">Envío máximo cada 3 s para ahorrar batería · El GPS solo funciona con permiso del docente.</p>
+    </div>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    (function () {
+      var GEO = { lat: -13.6175375, lon: -72.867453125, radioM: 200, id: 1 };
+
+      var colegioSel = document.getElementById('colegio');
+      var nombreEl = document.getElementById('nombre');
+      var estadoEl = document.getElementById('estado');
+      var latEl = document.getElementById('lat');
+      var lonEl = document.getElementById('lon');
+      var accEl = document.getElementById('acc');
+      var distEl = document.getElementById('dist');
+      var geoEl = document.getElementById('geo');
+      var gaugeEl = document.getElementById('gauge');
+      var lastEl = document.getElementById('last');
+      var errorEl = document.getElementById('error');
+      var btn = document.getElementById('btn');
+      var secureEl = document.getElementById('secure');
+      var box = document.getElementById('https-box');
+      var link = document.getElementById('https-link');
+      var goBtn = document.getElementById('https-go');
+
+      var rastreando = false;
+      var watchId = null;
+      var ultimoEnvio = 0;
+      var THROTTLE_MS = 3000;
+
+      // ---------- utilidades de interfaz ----------
+
+      function setEstado(texto, clase) {
+        estadoEl.textContent = texto;
+        estadoEl.className = 'state-pill ' + clase;
+      }
+
+      function feedback(msg, tipo) {
+        errorEl.textContent = msg || '';
+        errorEl.className = 'feedback' + (tipo ? ' ' + tipo : '');
+      }
+
+      function pintarGeo(dentro, distancia, radio) {
+        var r = radio || GEO.radioM || 200;
+        var p = Math.max(0, Math.min(distancia / r, 1));
+        geoEl.className = 'badge ' + (dentro ? 'ok' : 'warn');
+        geoEl.textContent = (dentro ? 'Dentro del radio' : 'Fuera del radio') + ' · ' + Math.round(distancia) + ' m';
+        gaugeEl.className = 'gauge ' + (dentro ? 'ok' : 'warn');
+        gaugeEl.style.setProperty('--p', p.toFixed(3));
+        distEl.textContent = Math.round(distancia) + ' m';
+      }
+
+      function resetGeo() {
+        geoEl.className = 'badge neutral';
+        geoEl.textContent = 'Sin señal GPS';
+        gaugeEl.className = 'gauge';
+        gaugeEl.style.setProperty('--p', '0');
+        distEl.textContent = '—';
+      }
+
+      // ---------- carga de colegios ----------
+
+      function cargarColegios() {
+        fetch('/api/colegios').then(function (r) { return r.json(); }).then(function (arr) {
+          colegioSel.innerHTML = arr.map(function (c) {
+            return '<option value="' + c.id + '">' + c.nombre + ' (' + c.radioM + ' m)</option>';
+          }).join('');
+          var saved = localStorage.getItem('colegio_id');
+          if (saved) colegioSel.value = saved;
+          actualizarGEO();
+        }).catch(function () {});
+      }
+
+      function actualizarGEO() {
+        var id = colegioSel.value;
+        localStorage.setItem('colegio_id', id || '');
+        fetch('/api/geocerca?colegio_id=' + (id || '')).then(function (r) { return r.json(); }).then(function (j) {
+          GEO = j;
+        }).catch(function () {});
+      }
+
+      colegioSel.addEventListener('change', function () {
+        actualizarGEO();
+        resetGeo();
+      });
+      cargarColegios();
+
+      function distM(lat1, lon1, lat2, lon2) {
+        var R = 6371000, dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
+        var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+          Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return 2 * R * Math.asin(Math.sqrt(a));
+      }
+
+      // ---------- identidad del dispositivo ----------
+
+      var deviceId = localStorage.getItem('deviceId');
+      if (!deviceId) {
+        deviceId = 'dev-' + Math.random().toString(36).slice(2, 10);
+        localStorage.setItem('deviceId', deviceId);
+      }
+      nombreEl.value = localStorage.getItem('nombre') || '';
+      nombreEl.addEventListener('change', function () { localStorage.setItem('nombre', nombreEl.value); });
+      function miNombre() { return (nombreEl.value || 'Sin nombre').slice(0, 40); }
+
+      // ---------- HTTPS ----------
+
+      var HTTPS_PORT = 3443;
+      if (window.isSecureContext) {
+        secureEl.className = 'badge ok';
+        secureEl.textContent = '🔒 HTTPS · GPS permitido';
+      } else {
+        secureEl.className = 'badge warn';
+        secureEl.textContent = '⚠ HTTP · GPS bloqueado';
+        var httpsUrl = 'https://' + location.hostname + ':' + HTTPS_PORT + location.pathname;
+        link.href = httpsUrl;
+        link.textContent = httpsUrl;
+        box.style.display = 'block';
+        goBtn.addEventListener('click', function () { location.href = httpsUrl; });
+      }
+
+      // ---------- socket ----------
+
+      var socket = io();
+      socket.on('connect', function () {
+        setEstado(rastreando ? 'Rastreando…' : 'Conectado', 'ok');
+        socket.emit('registro', { deviceId: deviceId, nombre: miNombre() });
+      });
+      socket.on('disconnect', function () {
+        setEstado('Desconectado', 'off');
+      });
+      socket.on('geocerca_estado', function (d) {
+        pintarGeo(!!d.dentro, d.distanciaM, d.radioM);
+      });
+
+      // ---------- GPS ----------
+
+      function onSuccess(pos) {
+        var lat = pos.coords.latitude;
+        var lon = pos.coords.longitude;
+        var acc = pos.coords.accuracy;
+
+        latEl.textContent = lat.toFixed(6);
+        lonEl.textContent = lon.toFixed(6);
+        accEl.textContent = acc != null ? Math.round(acc) + ' m' : '—';
+
+        var d = distM(lat, lon, GEO.lat, GEO.lon);
+        if (isFinite(d)) pintarGeo(d <= GEO.radioM, d, GEO.radioM);
+
+        var ahora = Date.now();
+        if (ahora - ultimoEnvio >= THROTTLE_MS) {
+          ultimoEnvio = ahora;
+          window.__lastPos = { lat: lat, lon: lon };
+          socket.emit('posicion_movil', {
+            lat: lat,
+            lon: lon,
+            deviceId: deviceId,
+            nombre: miNombre(),
+            colegio_id: colegioSel.value
+          });
+          lastEl.textContent = new Date().toLocaleTimeString('es-ES', { hour12: false });
+        }
+      }
+
+      function onError(err) {
+        var msg;
+        switch (err.code) {
+          case 1:
+            msg = window.isSecureContext
+              ? 'Permiso denegado. Toca el candado 🔒 > Permisos > Ubicación > Permitir, y activa el GPS en Ajustes.'
+              : 'Bloqueado por HTTP inseguro. Toca «Abrir versión HTTPS 🔒» y acepta el aviso una vez.';
+            break;
+          case 2:
+            msg = 'Posición no disponible. Verifica que el GPS esté activado.';
+            break;
+          case 3:
+            msg = 'Tiempo de espera agotado buscando GPS. Intenta en exteriores.';
+            break;
+          default:
+            msg = 'Error GPS: ' + (err.message || 'desconocido');
+        }
+        feedback(msg, 'bad');
+        setEstado('Error GPS', 'warn');
+      }
+
+      function iniciar() {
+        feedback('');
+        if (!('geolocation' in navigator)) {
+          feedback('Este dispositivo o navegador no soporta geolocalización.', 'bad');
+          return;
+        }
+        if (!window.isSecureContext) {
+          feedback('Estás en HTTP. Usa el botón «Abrir versión HTTPS 🔒» para desbloquear el GPS.', 'warn');
+          return;
+        }
+        watchId = navigator.geolocation.watchPosition(onSuccess, onError, {
+          enableHighAccuracy: true,
+          maximumAge: 1000,
+          timeout: 10000
+        });
+        rastreando = true;
+        btn.textContent = 'Detener rastreo';
+        btn.className = 'btn btn-danger btn-block';
+        setEstado(socket.connected ? 'Rastreando…' : 'Conectado', 'ok');
+      }
+
+      function detener() {
+        if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        rastreando = false;
+        btn.textContent = 'Iniciar rastreo';
+        btn.className = 'btn btn-dark btn-block';
+        setEstado(socket.connected ? 'Conectado' : 'Desconectado', socket.connected ? 'ok' : 'off');
+      }
+
+      btn.addEventListener('click', function () {
+        if (rastreando) detener();
+        else iniciar();
+      });
+
+      document.getElementById('btn-checkin').addEventListener('click', function () {
+        if (!window.__lastPos) {
+          feedback('Aún sin GPS. Pulsa «Iniciar rastreo» y espera señal.', 'warn');
+          return;
+        }
+        fetch('/api/checkin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            deviceId: deviceId,
+            nombre: miNombre(),
+            colegio_id: colegioSel.value,
+            lat: window.__lastPos.lat,
+            lon: window.__lastPos.lon
+          })
+        }).then(function (r) { return r.json(); }).then(function (j) {
+          if (j.dentro) {
+            feedback('✅ Ingreso registrado en ' + (j.colegio.nombre || '') + ' a las ' + j.hora + ' (' + j.distanciaM + ' m).', 'ok');
+          } else {
+            feedback('⚠️ Estás a ' + j.distanciaM + ' m, fuera del radio. Acércate al colegio y reintenta.', 'warn');
+          }
+        }).catch(function () {
+          feedback('Error de red al registrar.', 'bad');
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

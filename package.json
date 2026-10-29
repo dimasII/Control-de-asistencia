@@ -1,0 +1,23 @@
+{
+  "name": "rastreo-gps-tiempo-real",
+  "version": "1.0.0",
+  "description": "Rastreo de ubicación GPS en tiempo real con Express + Socket.io, optimizado para celulares de baja gama",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "tunnel": "npx cloudflared tunnel --url http://localhost:3000"
+  },
+  "keywords": [
+    "gps",
+    "socket.io",
+    "express",
+    "realtime",
+    "tracking"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}

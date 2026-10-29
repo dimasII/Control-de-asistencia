@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#fbfaf6" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23fbfaf6'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%236aa7c9'/%3E%3C/svg%3E" />
+  <title>Geocerca rural · Acceso</title>
+  <link rel="stylesheet" href="/ui.css" />
+  <style>
+    .access { max-width: 980px; }
+
+    .access-hero { padding: 26px; border-radius: var(--radius-xl); margin-bottom: 12px; }
+    .access-hero h1 {
+      margin-top: 15px;
+      font-size: clamp(1.8rem, 4.4vw, 2.7rem);
+      line-height: 1.02;
+      font-weight: 680;
+      letter-spacing: -0.05em;
+      max-width: 22ch;
+    }
+    .access-hero p {
+      margin-top: 12px;
+      max-width: 60ch;
+      font-size: 0.92rem;
+      line-height: 1.7;
+      color: var(--muted);
+    }
+
+    .access-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .access-card {
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+      border-radius: var(--radius-xl);
+      text-decoration: none;
+      color: inherit;
+      transition: transform 0.22s ease, box-shadow 0.22s ease;
+    }
+
+    .access-card:hover { transform: translateY(-2px); box-shadow: 0 34px 80px rgba(16, 24, 40, 0.11); }
+    .access-card:focus-visible { outline: none; box-shadow: 0 0 0 4px rgba(106, 167, 201, 0.28), var(--shadow); }
+
+    .access-icon {
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      border-radius: 15px;
+      font-size: 1.15rem;
+      background: linear-gradient(180deg, #ffffff, rgba(248, 250, 252, 0.82));
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      box-shadow: inset 0 1px 0 #fff, 0 8px 18px rgba(15, 23, 42, 0.07);
+    }
+    .access-icon.docente { box-shadow: inset 0 1px 0 #fff, 0 0 22px rgba(106, 167, 201, 0.35); }
+    .access-icon.supervisor { box-shadow: inset 0 1px 0 #fff, 0 0 22px rgba(122, 134, 214, 0.35); }
+
+    .access-role {
+      margin-top: 16px;
+      font-size: 0.66rem;
+      font-weight: 650;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .access-card h2 {
+      margin-top: 7px;
+      font-size: 1.35rem;
+      letter-spacing: -0.04em;
+    }
+    .access-card p {
+      margin-top: 9px;
+      font-size: 0.85rem;
+      line-height: 1.65;
+      color: var(--muted);
+    }
+
+    .access-list {
+      margin: 15px 0 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 7px;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+    .access-list li { display: flex; gap: 8px; align-items: flex-start; }
+    .access-list li::before {
+      content: "";
+      flex: 0 0 auto;
+      width: 6px;
+      height: 6px;
+      margin-top: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+    .access-card.accent-2 .access-list li::before { background: var(--accent-2); }
+
+    .access-go {
+      margin-top: auto;
+      padding-top: 18px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      font-weight: 650;
+      color: var(--ink);
+    }
+    .access-card:hover .access-go { color: var(--accent-2); }
+
+    @media (max-width: 720px) {
+      .access-grid { grid-template-columns: 1fr; }
+      .access-hero { padding: 20px; }
+      .access-card { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+
+  <main class="shell access">
+    <header class="glass deboss topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"><span></span></div>
+        <div>
+          <div class="eyebrow">Geocerca rural</div>
+          <div class="brand-name">Asistencia docente</div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <span id="estado" class="state-pill neutral">Comprobando…</span>
+      </div>
+    </header>
+
+    <section class="glass deboss access-hero">
+      <span class="pill"><span class="pill-dot"></span> GPS de precisión · geocerca de 200 m</span>
+      <h1>Elige cómo entrar.</h1>
+      <p>
+        Dos accesos: el docente registra su llegada desde el celular con GPS; el supervisor revisa el estado en vivo y
+        descarga el reporte del día. La fecha y la hora las pone el servidor.
+      </p>
+    </section>
+
+    <section class="access-grid">
+      <a class="glass deboss access-card" href="/">
+        <span class="access-icon docente" aria-hidden="true">📍</span>
+        <div class="access-role">Docente</div>
+        <h2>Registrar mi ingreso</h2>
+        <p>Activa el GPS, elige tu colegio y registra tu llegada cuando estés dentro del radio.</p>
+        <ul class="access-list">
+          <li>Permiso de ubicación en tu celular</li>
+          <li>Indica si estás dentro o fuera del área</li>
+          <li>Hora y fecha oficiales del servidor</li>
+        </ul>
+        <span class="access-go">Entrar al registro →</span>
+      </a>
+
+      <a class="glass deboss access-card accent-2" href="/monitor.html">
+        <span class="access-icon supervisor" aria-hidden="true">🛰️</span>
+        <div class="access-role">Supervisor</div>
+        <h2>Panel de control</h2>
+        <p>Quién está en el área ahora, historial por colegio y fecha, y descarga CSV para Excel.</p>
+        <ul class="access-list">
+          <li>Conectados y dentro del radio en vivo</li>
+          <li>Historial con hora del servidor</li>
+          <li>Reporte CSV del día</li>
+        </ul>
+        <span class="access-go">Entrar al panel →</span>
+      </a>
+    </section>
+
+    <p class="fineprint">Datos locales en SQLite · el GPS solo se activa con permiso del docente</p>
+  </main>
+
+  <script>
+    (function () {
+      var estado = document.getElementById('estado');
+
+      function comprobar() {
+        fetch('/health').then(function (r) {
+          if (!r.ok) throw new Error('sin respuesta');
+          return r.json();
+        }).then(function () {
+          estado.className = 'state-pill ok';
+          estado.textContent = 'Servidor conectado';
+        }).catch(function () {
+          estado.className = 'state-pill off';
+          estado.textContent = 'Sin conexión';
+        });
+      }
+
+      comprobar();
+      setInterval(comprobar, 20000);
+    })();
+  </script>
+</body>
+</html>
