@@ -1,4 +1,3 @@
-Mr Ivan's house
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
@@ -107,7 +106,6 @@ Mr Ivan's house
       display: inline-flex;
       align-items: center;
       gap: 8px;
-  const nLat = Number(lat);
       font-weight: 650;
       color: var(--ink);
     }
@@ -174,7 +172,6 @@ Mr Ivan's house
       </a>
     </section>
 
-    <p class="fineprint">Datos locales en SQLite · el GPS solo se activa con permiso del docente</p>
   </main>
 
   <script>
@@ -190,7 +187,7 @@ Mr Ivan's house
           estado.textContent = 'Servidor conectado';
         }).catch(function () {
           estado.className = 'state-pill off';
-  try {   estado.textContent = 'Sin conexión';
+          estado.textContent = 'Sin conexión';
         });
       }
 
@@ -200,4 +197,3 @@ Mr Ivan's house
   </script>
 </body>
 </html>
-  const body = rows.map((r) => [r.id, esc(r.colegio), r.fecha, r.hora, esc(r.nombre), r.deviceId, r.lat, r.lon, r.distanciaM, r.dentro ? 'Yes' : 'NO', r.mapsUrl].join(',')).join('\n');        var exists = arr.some(function (c) { return String(c.id) === String(schoolCurrent); });      var activeIds = new Set();          if (!arr || !arr.length) return;      socket.on('schools_updated', function () {        resetGeo();
