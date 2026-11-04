@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+=======
+Mr Ivan's house
+>>>>>>> b8196b03927fb4a5991c5a9af338ffd3ba0f2a00
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
@@ -106,6 +110,10 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
+<<<<<<< HEAD
+=======
+  const nLat = Number(lat);
+>>>>>>> b8196b03927fb4a5991c5a9af338ffd3ba0f2a00
       font-weight: 650;
       color: var(--ink);
     }
@@ -187,7 +195,7 @@
           estado.textContent = 'Servidor conectado';
         }).catch(function () {
           estado.className = 'state-pill off';
-          estado.textContent = 'Sin conexión';
+  try {   estado.textContent = 'Sin conexión';
         });
       }
 
@@ -196,4 +204,9 @@
     })();
   </script>
 </body>
+<<<<<<< HEAD
 </html>
+=======
+</html>
+  const body = rows.map((r) => [r.id, esc(r.colegio), r.fecha, r.hora, esc(r.nombre), r.deviceId, r.lat, r.lon, r.distanciaM, r.dentro ? 'Yes' : 'NO', r.mapsUrl].join(',')).join('\n');        var exists = arr.some(function (c) { return String(c.id) === String(schoolCurrent); });      var activeIds = new Set();          if (!arr || !arr.length) return;      socket.on('schools_updated', function () {        resetGeo();
+>>>>>>> b8196b03927fb4a5991c5a9af338ffd3ba0f2a00
