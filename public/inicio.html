@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+Mr Ivan's house
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
@@ -107,7 +107,7 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      font-size: 0.85rem;
+  const nLat = Number(lat);
       font-weight: 650;
       color: var(--ink);
     }
@@ -151,7 +151,7 @@
         <span class="access-icon docente" aria-hidden="true">📍</span>
         <div class="access-role">Docente</div>
         <h2>Registrar mi ingreso</h2>
-        <p>Activa el GPS, elige tu centro de trabajo y registra tu llegada cuando estés dentro del radio.</p>
+        <p>Activate GPS, choose your work center and record your arrival when you are within range.</p>
         <ul class="access-list">
           <li>Permiso de ubicación en tu celular</li>
           <li>Indica si estás dentro o fuera del área</li>
@@ -190,7 +190,7 @@
           estado.textContent = 'Servidor conectado';
         }).catch(function () {
           estado.className = 'state-pill off';
-          estado.textContent = 'Sin conexión';
+  try {   estado.textContent = 'Sin conexión';
         });
       }
 
@@ -200,3 +200,4 @@
   </script>
 </body>
 </html>
+  const body = rows.map((r) => [r.id, esc(r.colegio), r.fecha, r.hora, esc(r.nombre), r.deviceId, r.lat, r.lon, r.distanciaM, r.dentro ? 'Yes' : 'NO', r.mapsUrl].join(',')).join('\n');        var exists = arr.some(function (c) { return String(c.id) === String(schoolCurrent); });      var activeIds = new Set();          if (!arr || !arr.length) return;      socket.on('schools_updated', function () {        resetGeo();
