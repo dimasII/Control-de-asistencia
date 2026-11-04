@@ -19,6 +19,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 const { DatabaseSync } = require('node:sqlite');
 const db = new DatabaseSync(path.join(__dirname, 'tesis.db'));
 db.exec(`
+PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS colegios (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   nombre TEXT NOT NULL,
@@ -42,15 +43,61 @@ CREATE TABLE IF NOT EXISTS registros (
 );
 CREATE INDEX IF NOT EXISTS idx_reg_col_fecha ON registros(colegio_id, fecha);
 `);
-const nColegios = db.prepare('SELECT COUNT(*) AS n FROM colegios').get().n;
-if (nColegios === 0) {
-  db.prepare('INSERT INTO colegios (nombre, lat, lon, radioM) VALUES (?,?,?,?)')
-    .run('I.E. Prueba - Av. Inca Garcilaso (94JM+X2M)', -13.6175375, -72.867453125, 200);
+const centrosIniciales = [
+  { nombre: 'casa de Ivan', lat: -13.632205365987263, lon: -72.88621458510703, radioM: 200 },
+  { nombre: 'I.E. Prueba - Av. Inca Garcilaso (94JM+X2M)', lat: -13.6175375, lon: -72.867453125, radioM: 200 }
+];
+for (const c of centrosIniciales) {
+  const existe = db.prepare('SELECT COUNT(*) AS n FROM colegios WHERE nombre = ?').get(c.nombre).n;
+  if (existe === 0) {
+    db.prepare('INSERT INTO colegios (nombre, lat, lon, radioM) VALUES (?,?,?,?)')
+      .run(c.nombre, c.lat, c.lon, c.radioM);
+  }
 }
-function listaColegios() { return db.prepare('SELECT * FROM colegios ORDER BY id').all(); }
+
+// 2. Estado en memoria y funciones auxiliares
+const dispositivos = new Map(); // deviceId -> { deviceId, nombre, socketId, lat, lon, distanciaM, dentro, fecha, hora, mapsUrl, conectado, ultimaVez }
+let ioRef = null; // referencia para las rutas HTTP que también actualizan presencia
+const ultimoGuardado = new Map(); // deviceId+colegio -> timestamp (evita llenar BD cada 3s)
+
+function broadcastLista(io) {
+  if (io) io.emit('lista_dispositivos', Array.from(dispositivos.values()));
+}
+
+function esCoordenadaValida(lat, lon) {
+  return (
+    typeof lat === 'number' &&
+    typeof lon === 'number' &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lon) &&
+    lat >= -90 && lat <= 90 &&
+    lon >= -180 && lon <= 180
+  );
+}
+
+// Distancia Haversine en metros (protegido contra a > 1 por redondeo flotante)
+function distanciaMetros(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(Math.max(0, a))));
+}
+
+function listaColegios() {
+  return db.prepare('SELECT * FROM colegios ORDER BY id').all();
+}
+
 function getColegio(id) {
-  if (id == null) return listaColegios()[0];
-  return db.prepare('SELECT * FROM colegios WHERE id = ?').get(Number(id)) || listaColegios()[0];
+  const todos = listaColegios();
+  if (!todos || todos.length === 0) {
+    return { id: 0, nombre: 'Sin centro configurado', lat: 0, lon: 0, radioM: 200 };
+  }
+  if (id == null) return todos[0];
+  const encontrado = db.prepare('SELECT * FROM colegios WHERE id = ?').get(Number(id));
+  return encontrado || todos[0];
 }
 
 // Ruta de salud (útil para monitoreo)
@@ -60,15 +107,26 @@ app.get('/health', (req, res) => res.json({ ok: true, secure: req.secure || fals
 app.get('/api/colegios', (req, res) => res.json(listaColegios()));
 app.post('/api/colegios', (req, res) => {
   const { nombre, lat, lon, radioM } = req.body || {};
-  if (!nombre || !esCoordenadaValida(Number(lat), Number(lon))) return res.status(400).json({ error: 'nombre/lat/lon inválidos' });
-  const r = db.prepare('INSERT INTO colegios (nombre, lat, lon, radioM) VALUES (?,?,?,?)')
-    .run(String(nombre).slice(0, 80), Number(lat), Number(lon), Number(radioM) || 200);
-  res.json({ id: Number(r.lastInsertRowid) });
+  const nLat = Number(lat);
+  const nLon = Number(lon);
+  const nom = String(nombre || '').trim().slice(0, 80);
+  if (!nom || !esCoordenadaValida(nLat, nLon)) {
+    return res.status(400).json({ error: 'nombre/lat/lon inválidos' });
+  }
+  const radio = Math.max(10, Math.min(Number(radioM) || 200, 50000));
+  try {
+    const r = db.prepare('INSERT INTO colegios (nombre, lat, lon, radioM) VALUES (?,?,?,?)')
+      .run(nom, nLat, nLon, radio);
+    if (ioRef) ioRef.emit('colegios_actualizados');
+    res.json({ id: Number(r.lastInsertRowid), ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Error al insertar colegio en BD: ' + err.message });
+  }
 });
 
 // === GEOCERCA por defecto (compatibilidad): primer colegio ===
 function geocercaDefault() {
-  const c = listaColegios()[0];
+  const c = getColegio(null);
   return { lat: c.lat, lon: c.lon, radioM: c.radioM, nombre: c.nombre, id: c.id };
 }
 app.get('/api/geocerca', (req, res) => {
@@ -132,8 +190,12 @@ function guardarRegistro({ colegio_id, deviceId, nombre, lat, lon }) {
   const fecha = ahora.toLocaleDateString('es-ES');
   const hora = ahora.toLocaleTimeString('es-ES', { hour12: false });
   const mapsUrl = `https://www.google.com/maps?q=${lat},${lon}`;
-  db.prepare(`INSERT INTO registros (colegio_id, deviceId, nombre, lat, lon, distanciaM, dentro, fecha, hora, timestamp, mapsUrl)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(col.id, deviceId, nombre, lat, lon, Math.round(dist), dentro, fechaISO, hora, Date.now(), mapsUrl);
+  try {
+    db.prepare(`INSERT INTO registros (colegio_id, deviceId, nombre, lat, lon, distanciaM, dentro, fecha, hora, timestamp, mapsUrl)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(col.id, deviceId, nombre, lat, lon, Math.round(dist), dentro, fechaISO, hora, Date.now(), mapsUrl);
+  } catch (err) {
+    console.error('Error al guardar registro en BD:', err.message);
+  }
   return { colegio: col, distanciaM: Math.round(dist), dentro: !!dentro, fecha, fechaISO, hora, mapsUrl };
 }
 app.post('/api/checkin', (req, res) => {
@@ -162,44 +224,14 @@ app.get('/api/reporte.csv', (req, res) => {
   const rows = db.prepare(sql).all(...params);
   const head = 'id,colegio,fecha,hora,nombre,deviceId,lat,lon,distanciaM,dentro,mapsUrl\n';
   const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const body = rows.map((r) => [r.id, esc(r.colegio), r.fecha, r.hora, esc(r.nombre), r.deviceId, r.lat, r.lon, r.distanciaM, r.dentro, r.mapsUrl].join(',')).join('\n');
+  const body = rows.map((r) => [r.id, esc(r.colegio), r.fecha, r.hora, esc(r.nombre), r.deviceId, r.lat, r.lon, r.distanciaM, r.dentro ? 'SÍ' : 'NO', r.mapsUrl].join(',')).join('\n');
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="reporte.csv"');
   res.send('\ufeff' + head + body);
 });
 
-// Distancia Haversine en metros
-function distanciaMetros(lat1, lon1, lat2, lon2) {
-  const R = 6371000;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(a));
-}
-
-// 2. Validación de coordenadas
-function esCoordenadaValida(lat, lon) {
-  return (
-    typeof lat === 'number' &&
-    typeof lon === 'number' &&
-    Number.isFinite(lat) &&
-    Number.isFinite(lon) &&
-    lat >= -90 && lat <= 90 &&
-    lon >= -180 && lon <= 180
-  );
-}
-
 // 3. Lógica Socket.io compartida (misma para HTTP y HTTPS)
 // Roles: móvil (/) envía GPS, supervisor (/monitor.html) solo observa
-const dispositivos = new Map(); // deviceId -> { deviceId, nombre, socketId, lat, lon, distanciaM, dentro, fecha, hora, mapsUrl, conectado, ultimaVez }
-let ioRef = null; // referencia para las rutas HTTP que también actualizan presencia
-
-function broadcastLista(io) {
-  io.emit('lista_dispositivos', Array.from(dispositivos.values()));
-}
-const ultimoGuardado = new Map(); // deviceId+colegio -> timestamp (evita llenar BD cada 3s)
 function configurarSockets(io) {
   io.on('connection', (socket) => {
     console.log(`\x1b[32m[+] Cliente conectado\x1b[0m | ID: ${socket.id}`);

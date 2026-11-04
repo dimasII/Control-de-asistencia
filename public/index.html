@@ -30,9 +30,7 @@
     }
 
     .stack > * + * { margin-top: 12px; }
-
     .form-grid { display: grid; gap: 14px; }
-
     .geo-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
     .geo-copy { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
     .geo-copy .badge { max-width: 100%; white-space: normal; }
@@ -157,7 +155,7 @@
         </div>
         <div class="form-grid">
           <div>
-            <label class="field-label" for="colegio">Colegio</label>
+            <label class="field-label" for="colegio">Centro de trabajo / Colegio</label>
             <select id="colegio" class="control"></select>
           </div>
           <div>
@@ -240,7 +238,6 @@
       var ultimoEnvio = 0;
       var THROTTLE_MS = 3000;
 
-      // ---------- sesión de asistencia (sobrevive a recargas y cambios de página) ----------
       var SES_KEY = 'sesion_asistencia';
       var sesionEl = document.getElementById('sesion');
       var sesionInfoEl = document.getElementById('sesion-info');
@@ -277,8 +274,6 @@
         mostrarSesion(s);
       }
 
-      // ---------- utilidades de interfaz ----------
-
       function setEstado(texto, clase) {
         estadoEl.textContent = texto;
         estadoEl.className = 'state-pill ' + clase;
@@ -307,25 +302,35 @@
         distEl.textContent = '—';
       }
 
-      // ---------- carga de colegios ----------
-
       function cargarColegios() {
         fetch('/api/colegios').then(function (r) { return r.json(); }).then(function (arr) {
+          if (!arr || !arr.length) return;
           colegioSel.innerHTML = arr.map(function (c) {
             return '<option value="' + c.id + '">' + c.nombre + ' (' + c.radioM + ' m)</option>';
           }).join('');
           var saved = localStorage.getItem('colegio_id');
-          if (saved) colegioSel.value = saved;
+          var existe = arr.some(function (c) { return String(c.id) === String(saved); });
+          if (existe) {
+            colegioSel.value = saved;
+          } else {
+            colegioSel.value = arr[0].id;
+            localStorage.setItem('colegio_id', arr[0].id);
+          }
           actualizarGEO();
-        }).catch(function () {});
+        }).catch(function (err) { console.error('Error al cargar colegios:', err); });
       }
 
       function actualizarGEO() {
         var id = colegioSel.value;
-        localStorage.setItem('colegio_id', id || '');
-        fetch('/api/geocerca?colegio_id=' + (id || '')).then(function (r) { return r.json(); }).then(function (j) {
+        if (!id) return;
+        localStorage.setItem('colegio_id', id);
+        fetch('/api/geocerca?colegio_id=' + id).then(function (r) { return r.json(); }).then(function (j) {
           GEO = j;
-        }).catch(function () {});
+          if (window.__lastPos) {
+            var d = distM(window.__lastPos.lat, window.__lastPos.lon, GEO.lat, GEO.lon);
+            if (isFinite(d)) pintarGeo(d <= GEO.radioM, d, GEO.radioM);
+          }
+        }).catch(function (err) { console.error('Error al actualizar geocerca:', err); });
       }
 
       colegioSel.addEventListener('change', function () {
@@ -339,10 +344,8 @@
         var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
           Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
           Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        return 2 * R * Math.asin(Math.sqrt(a));
+        return 2 * R * Math.asin(Math.min(1, Math.sqrt(Math.max(0, a))));
       }
-
-      // ---------- identidad del dispositivo ----------
 
       var deviceId = localStorage.getItem('deviceId');
       if (!deviceId) {
@@ -350,10 +353,15 @@
         localStorage.setItem('deviceId', deviceId);
       }
       nombreEl.value = localStorage.getItem('nombre') || '';
-      nombreEl.addEventListener('change', function () { localStorage.setItem('nombre', nombreEl.value); });
+      function actualizarNombre() {
+        localStorage.setItem('nombre', nombreEl.value);
+        if (socket && socket.connected) {
+          socket.emit('registro', { deviceId: deviceId, nombre: miNombre() });
+        }
+      }
+      nombreEl.addEventListener('input', actualizarNombre);
+      nombreEl.addEventListener('change', actualizarNombre);
       function miNombre() { return (nombreEl.value || 'Sin nombre').slice(0, 40); }
-
-      // ---------- HTTPS ----------
 
       var HTTPS_PORT = 3443;
       if (window.isSecureContext) {
@@ -369,7 +377,6 @@
         goBtn.addEventListener('click', function () { location.href = httpsUrl; });
       }
 
-      // ---------- socket ----------
 
       var socket = io();
       socket.on('connect', function () {
@@ -382,8 +389,10 @@
       socket.on('geocerca_estado', function (d) {
         pintarGeo(!!d.dentro, d.distanciaM, d.radioM);
       });
+      socket.on('colegios_actualizados', function () {
+        cargarColegios();
+      });
 
-      // ---------- GPS ----------
 
       function onSuccess(pos) {
         var lat = pos.coords.latitude;
@@ -462,14 +471,13 @@
         btn.textContent = 'Iniciar rastreo';
         btn.className = 'btn btn-dark btn-block';
         setEstado(socket.connected ? 'Conectado' : 'Desconectado', socket.connected ? 'ok' : 'off');
+        resetGeo();
         borrarSesion();
         mostrarSesion(null);
       }
 
       sesionBtn.addEventListener('click', function () { detener(); });
 
-      // Al cerrar o salir de la página se manda la última posición conocida
-      // (sendBeacon funciona aunque la pestaña se esté cerrando).
       function enviarUltimaPosicion() {
         var s = leerSesion();
         if (!s || !s.activo || !window.__lastPos) return;
@@ -480,16 +488,19 @@
           lat: window.__lastPos.lat,
           lon: window.__lastPos.lon
         });
-        if (navigator.sendBeacon) {
-          navigator.sendBeacon('/api/posicion', new Blob([body], { type: 'application/json' }));
-        } else {
-          fetch('/api/posicion', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: body,
-            keepalive: true
-          }).catch(function () {});
-        }
+        try {
+          if (navigator.sendBeacon) {
+            var sent = navigator.sendBeacon('/api/posicion', new Blob([body], { type: 'application/json' }));
+            if (sent) return;
+          }
+        } catch (e) {}
+
+        fetch('/api/posicion', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: body,
+          keepalive: true
+        }).catch(function () {});
       }
       window.addEventListener('pagehide', enviarUltimaPosicion);
 
@@ -540,7 +551,7 @@
           feedback('Error de red al registrar.', 'bad');
         });
       });
-      // ---------- reanudar sesión si la había (recarga, cambio de página, app reabierta) ----------
+
       var sesionPrevia = leerSesion();
       if (sesionPrevia && sesionPrevia.activo) {
         mostrarSesion(sesionPrevia);

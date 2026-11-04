@@ -1,9 +1,9 @@
-first committeeml>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    "git.autofetch": true, content="#fbfaf6" />
+  <meta name="theme-color" content="#fbfaf6" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23fbfaf6'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%236aa7c9'/%3E%3C/svg%3E" />
   <title>Supervisor · Asistencia docente rural</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -145,7 +145,7 @@ first committeeml>
       .stat-num { font-size: 1.5rem; }
       .stat-top { font-size: 0.6rem; letter-spacing: 0.08em; }
       .stat-sub { display: none; }
-            <a class="link" href="/inicio.html">Home →</a>
+    }
 
     @media (max-width: 520px) {
       .toolbar { grid-template-columns: 1fr; }
@@ -168,6 +168,7 @@ first committeeml>
         </div>
       </div>
       <nav class="topbar-nav">
+        <a class="nav-pill" href="/inicio.html">Inicio</a>
         <a class="nav-pill" href="/">Docente</a>
         <a class="nav-pill active" href="/monitor.html" aria-current="page">Supervisor</a>
       </nav>
@@ -190,7 +191,7 @@ first committeeml>
 
     <section class="glass deboss toolbar">
       <div>
-        <label class="field-label" for="colegio">Colegio</label>
+        <label class="field-label" for="colegio">Colegio / Centro de trabajo</label>
         <select id="colegio" class="control"></select>
       </div>
       <div>
@@ -200,7 +201,7 @@ first committeeml>
       <div class="toolbar-actions">
         <button id="btn-ver" class="btn btn-dark" type="button">Ver reporte</button>
         <button id="btn-csv" class="btn btn-ok" type="button">Descargar CSV</button>
-        <button id="btn-add" class="btn" type="button">+ Colegio</button>
+        <button id="btn-add" class="btn" type="button">+ Centro de trabajo</button>
       </div>
     </section>
 
@@ -302,15 +303,21 @@ first committeeml>
         sel.innerHTML = arr.map(function (c) {
           return '<option value="' + c.id + '">' + c.nombre + ' (' + c.radioM + ' m)</option>';
         }).join('');
-        if (!colegioActual) colegioActual = arr[0] && arr[0].id;
+        var existe = arr.some(function (c) { return String(c.id) === String(colegioActual); });
+        if (!existe && arr.length > 0) colegioActual = arr[0].id;
         if (colegioActual) sel.value = colegioActual;
         pintarMapa();
         verReporte();
-      });
+      }).catch(function (err) { console.error('Error al cargar colegios:', err); });
     }
+
+    socket.on('colegios_actualizados', function () {
+      loadColegios();
+    });
 
     function pintarMapa() {
       var id = document.getElementById('colegio').value;
+      if (!id) return;
       colegioActual = id;
       fetch('/api/geocerca?colegio_id=' + id).then(function (r) { return r.json(); }).then(function (g) {
         document.getElementById('info').textContent = g.nombre + ' · radio ' + g.radioM + ' m';
@@ -332,7 +339,7 @@ first committeeml>
           fillColor: '#2f9e6e',
           fillOpacity: 0.12
         }).addTo(map);
-      });
+      }).catch(function (err) { console.error('Error al cargar geocerca:', err); });
     }
 
     var ultimaLista = [];
@@ -373,16 +380,29 @@ first committeeml>
           '</tr>';
       }).join('');
 
-      var arr = ultimaLista;
+      var activeIds = new Set();
       if (map) {
-        arr.forEach(function (d) {
+        rel.forEach(function (d) {
           if (d.lat == null) return;
+          activeIds.add(d.deviceId);
           var color = d.dentro ? '#2f9e6e' : '#c8862a';
+          var tip = esc(d.nombre) + ' · ' + (d.dentro ? 'Dentro' : 'Fuera') + ' (' + (d.distanciaM == null ? 0 : d.distanciaM) + ' m)';
           if (!marks[d.deviceId]) {
-            marks[d.deviceId] = L.circleMarker([d.lat, d.lon], { radius: 8, color: color }).addTo(map);
+            marks[d.deviceId] = L.circleMarker([d.lat, d.lon], { radius: 8, color: color, fillColor: color, fillOpacity: 0.85 })
+              .addTo(map)
+              .bindTooltip(tip);
           } else {
             marks[d.deviceId].setLatLng([d.lat, d.lon]);
-            marks[d.deviceId].setStyle({ color: color });
+            marks[d.deviceId].setStyle({ color: color, fillColor: color });
+            marks[d.deviceId].setTooltipContent(tip);
+          }
+        });
+
+        // Limpiar marcas de docentes desconectados o fuera de este colegio
+        Object.keys(marks).forEach(function (id) {
+          if (!activeIds.has(id)) {
+            map.removeLayer(marks[id]);
+            delete marks[id];
           }
         });
       }
@@ -399,24 +419,30 @@ first committeeml>
     function verReporte() {
       var id = document.getElementById('colegio').value;
       var fecha = document.getElementById('fecha').value;
-      fetch('/api/registros?colegio_id=' + id + '&fecha=' + fecha).then(function (r) { return r.json(); }).then(function (rows) {
-        document.getElementById('s-bd').textContent = rows.length;
+      if (!id) return;
+      fetch('/api/registros?colegio_id=' + id + '&fecha=' + fecha)
+        .then(function (r) { return r.json(); })
+        .then(function (rows) {
+          document.getElementById('s-bd').textContent = rows.length;
 
-        document.getElementById('hist-table-wrap').hidden = rows.length === 0;
-        document.getElementById('hist-empty').hidden = rows.length > 0;
+          document.getElementById('hist-table-wrap').hidden = rows.length === 0;
+          document.getElementById('hist-empty').hidden = rows.length > 0;
 
-        document.getElementById('tbody-hist').innerHTML = rows.map(function (r) {
-          return '<tr>' +
-            '<td class="col-fecha">' + r.fecha + '</td>' +
-            '<td>' + r.hora + '</td>' +
-            '<td><strong>' + esc(r.nombre) + '</strong></td>' +
-            '<td>' + (r.dentro ? '<span class="badge ok">Sí</span>' : '<span class="badge warn">No</span>') + '</td>' +
-            '<td>' + r.distanciaM + ' m</td>' +
-            '<td class="coords col-coords">' + Number(r.lat).toFixed(6) + ', ' + Number(r.lon).toFixed(6) + '</td>' +
-            '<td><a class="link" target="_blank" rel="noopener" href="' + r.mapsUrl + '">Abrir</a></td>' +
-            '</tr>';
-        }).join('');
-      });
+          document.getElementById('tbody-hist').innerHTML = rows.map(function (r) {
+            return '<tr>' +
+              '<td class="col-fecha">' + r.fecha + '</td>' +
+              '<td>' + r.hora + '</td>' +
+              '<td><strong>' + esc(r.nombre) + '</strong></td>' +
+              '<td>' + (r.dentro ? '<span class="badge ok">Sí</span>' : '<span class="badge warn">No</span>') + '</td>' +
+              '<td>' + r.distanciaM + ' m</td>' +
+              '<td class="coords col-coords">' + Number(r.lat).toFixed(6) + ', ' + Number(r.lon).toFixed(6) + '</td>' +
+              '<td><a class="link" target="_blank" rel="noopener" href="' + r.mapsUrl + '">Abrir</a></td>' +
+              '</tr>';
+          }).join('');
+        })
+        .catch(function (err) {
+          console.error('Error al cargar reporte:', err);
+        });
     }
 
     document.getElementById('btn-ver').onclick = verReporte;
@@ -429,19 +455,49 @@ first committeeml>
     document.getElementById('btn-csv').onclick = function () {
       var id = document.getElementById('colegio').value;
       var fecha = document.getElementById('fecha').value;
+      if (!id) return;
       location.href = '/api/reporte.csv?colegio_id=' + id + '&fecha=' + fecha;
     };
 
     document.getElementById('btn-add').onclick = function () {
-      var nombre = prompt('Nombre del colegio de prueba:', 'I.E. Rural Prueba 02');
+      var nombre = prompt('Nombre del centro de trabajo / colegio:', 'Nuevo centro');
       if (!nombre) return;
-      var lat = parseFloat(prompt('Latitud (de Google Maps, clic derecho):', '-13.62'));
-      var lon = parseFloat(prompt('Longitud:', '-72.87'));
+      var latInput = prompt('Latitud (o pega "latitud, longitud" completo de Google Maps):', '-13.632205, -72.886214');
+      if (!latInput) return;
+      var lat, lon;
+      if (latInput.includes(',')) {
+        var partes = latInput.split(',');
+        lat = parseFloat(partes[0].trim());
+        lon = parseFloat(partes[1].trim());
+      } else {
+        lat = parseFloat(latInput);
+        var lonInput = prompt('Longitud:', '-72.8862');
+        if (!lonInput) return;
+        lon = parseFloat(lonInput);
+      }
+      if (isNaN(lat) || isNaN(lon)) {
+        alert('Coordenadas no válidas. Deben ser números decimales.');
+        return;
+      }
+      var radioStr = prompt('Radio de la geocerca en metros:', '200');
+      var radioM = parseInt(radioStr, 10) || 200;
+
       fetch('/api/colegios', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre: nombre, lat: lat, lon: lon, radioM: 200 })
-      }).then(function (r) { return r.json(); }).then(function () { loadColegios(); });
+        body: JSON.stringify({ nombre: nombre.trim(), lat: lat, lon: lon, radioM: radioM })
+      })
+      .then(function (r) {
+        if (!r.ok) return r.json().then(function (j) { throw new Error(j.error || 'Error al guardar'); });
+        return r.json();
+      })
+      .then(function (j) {
+        colegioActual = j.id;
+        loadColegios();
+      })
+      .catch(function (e) {
+        alert('Error: ' + e.message);
+      });
     };
 
     function esc(s) {

@@ -2,7 +2,9 @@
 
 Sistema para verificar que docentes de zonas rurales lleguen a su colegio, usando el GPS del celular y una geocerca de 200 m por colegio. El docente se registra desde su celular y el supervisor ve en vivo quién está dentro del área y saca reportes por colegio y fecha.
 
-Punto de prueba inicial: `94JM+X2M, Av. Inca Garcilaso de la Vega, Abancay 03001` → `-13.6175375, -72.8674531`, radio 200 m.
+Puntos de prueba configurados:
+- **casa de Ivan:** `-13.632205365987263, -72.88621458510703`, radio 200 m
+- **I.E. Prueba - Av. Inca Garcilaso (94JM+X2M):** `-13.6175375, -72.867453125`, radio 200 m
 
 ## Qué hace
 
@@ -65,7 +67,7 @@ Comparte la URL `https://...trycloudflare.com` que genera.
 ## Simular un registro sin ir al colegio
 
 ```powershell
-Invoke-RestMethod -Uri http://localhost:3000/api/checkin -Method Post -ContentType "application/json" -Body '{"deviceId":"dev-prueba1","nombre":"Profe Prueba","colegio_id":1,"lat":-13.6175375,"lon":-72.867453125}'
+Invoke-RestMethod -Uri http://localhost:3000/api/checkin -Method Post -ContentType "application/json" -Body '{"deviceId":"dev-prueba1","nombre":"Profe Prueba","colegio_id":4,"lat":-13.632205365987263,"lon":-72.88621458510703}'
 ```
 
 Luego revisa en el monitor la fecha de hoy.
